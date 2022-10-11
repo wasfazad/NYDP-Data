@@ -1,0 +1,117 @@
+---
+title: "NYPD Shooting Incident Data"
+output:
+  pdf_document: default
+  html_document: default
+date: "2022-09-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+install.packages("tidyverse")
+install.packages("lubridate")
+library(tidyverse)
+library(lubridate)
+```
+
+## Description of Data
+
+The NYPD Shooting Incident data set is a comprehensive list of shooting incidents that occurred in NYC starting in 2006 through the end of the previous calendar year. Each incident includes information on the location and time of the event, as well as victim and suspect demographic descriptions.
+
+## Import Data
+```{r data}
+data_url <- 'https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD'
+nypd_data <- read_csv(data_url)
+```
+
+## Initial Summary of Data
+```{r data summary}
+summary(nypd_data)
+```
+
+## Data Transformation
+```{r data transformation}
+nypd_data <- nypd_data %>% rename(Borough = 'BORO') %>% #change name from BORO to Borough
+  mutate(OCCUR_DATE = mdy(OCCUR_DATE)) %>% # convert date column entires to a date objects
+  select(-c(PRECINCT, JURISDICTION_CODE, LOCATION_DESC, STATISTICAL_MURDER_FLAG, X_COORD_CD, Y_COORD_CD, Lon_Lat)) # remove excess columns 
+summary(nypd_data)
+```
+There is missing demographic data for the perpetrator, which makes sense because they may not have been caught or identified. This missing date could be omitted with the following code if that information was needed in the analysis. 
+
+```{r omit}
+#sum(is.na(nypd_data))
+#nypd_data <- na.omit(nypd_data)
+```
+This code is not going to be used because this data exploration and analysis will focus on the specific boroughs and associated incident occurrences.
+
+## Visualize the Data
+```{r ggplot, echo=FALSE}
+# Isolate Applicable data
+# group incidents by date of occurence  
+nypd_data_occur <- nypd_data %>% count(OCCUR_DATE, sort=TRUE) 
+date <- nypd_data_occur$OCCUR_DATE
+Incidents <- nypd_data_occur$n
+data <- data.frame(date,Incidents)
+
+# Plot
+ggplot(data, aes(x=date, y=Incidents)) +
+  geom_line( color="#69b3a2", size=2, alpha=0.9, linetype=2) +
+  ggtitle("NYPD Shooting Incident Per Day")
+```
+
+Here we can see that the daily number of incidents for NYC has not changed dramatically over time. There seems to be an overall spike in incidents sometime around the beginning of 2020. 
+
+This plot does not provide insight into where the incidents are happening, so the following box plot will be used to explore that distribution
+
+```{r bar plot, echo=FALSE}
+par(mar=c(10, 3, 3, 1)) 
+barplot(table(nypd_data['Borough']), main="Incidents per Borough", las=2)
+```
+
+It looks like Brooklyn has the most reported incidents, and the following chart shows how many incidents per day are occurring there. 
+
+```{r ggplot Brooklyn, echo=FALSE}
+# Isolate Applicable data
+boro <- 'BROOKLYN'
+# group incidents by date and specifically Brooklyn
+nypd_data_Brook <- nypd_data %>% filter(Borough == boro) %>% count(OCCUR_DATE, sort=TRUE) 
+date <- nypd_data_Brook$OCCUR_DATE
+Incidents <- nypd_data_Brook$n
+data <- data.frame(date,Incidents)
+
+# Plot
+ggplot(data, aes(x=date, y=Incidents)) +
+  geom_line( color="#69b3a2", size=2, alpha=0.9, linetype=2) +
+  ggtitle("Brooklyn Shooting Incident Per Day")
+```
+
+Like the graph of the entire city, there is not a drastic increase or decrease in the number of daily occurrences through the time period capture in this data set.
+
+## Analyze the Data
+While there is not a drastic increase or decrease in the number of daily incidents over a long period of time, there do seem to be wide variations during smaller periods of time. Because of that variation it would be interesting to see the daily average incidents occurring in each borough. 
+
+```{r Analysis, echo=FALSE}
+# Group data by borough
+boro_daily <- nypd_data %>%
+  group_by(Borough) %>% 
+  count(OCCUR_DATE, sort=TRUE) 
+
+summary(boro_daily)
+```
+
+```{r Analysis cont, echo=FALSE}
+# calculate the daily average for the specific borough
+boro_daily_average <- boro_daily %>%
+  summarize(daily_average = mean(n))
+
+boro_daily_average
+```
+These daily averages per borough are all relatively similar. However these numbers do not take into account the size of the populations of these boroughs. It would be interesting to see where the number of incidents increase as the population density between boroughs increases. In order to successfully explore that, data on the population sizes of these boroughs at the time of the reported incidents would need to be collected. It would also be interesting to see if demographic features of the boroughs play a role in the number of reported incidents.
+
+## Conculsions and Biases
+In conclusion, the number of incidents reported in NYC has not dramatically increased or decreased since 2006. That same state holds for the specific boroughs as well, although the different boroughs do not have the same leave of reported incidents. For example Brooklyn has the highest average reported incidents compared to the other four boroughs. 
+
+The analysis presented here does not include any of the demographic data, which would be the most likely aspect of this data set to introduce bias. However personal knowledge of different boroughs and stereotypes associated with them could lead to a lack of further exploration of the data. As stated above Brooklyn had the highest average number of reported incidents, and if someone had heard that Brooklyn wasn't safe because of a certain group of people who live there or any other reason, that prior knowledge might stop further analysis because the current analysis confirmed a preconceived notion. This would be inappropriate because all reasons for the higher reported incidents would not be explored, therefore making the results inaccurate.
